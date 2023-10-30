@@ -55,6 +55,8 @@ func QueueMediaHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	log.Println("File saved: ", sf)
+
 	rq.File = sf
 	output, err := json.Marshal(rq)
 	io.WriteString(w, string(output))
