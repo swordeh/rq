@@ -49,7 +49,6 @@ func StoreFile(filename string, file io.Reader) (StoredFile, error) {
 	}
 
 	stored := StoredFile{Filename: path}
-	log.Println("File saved: ", stored)
 
 	return stored, nil
 }
