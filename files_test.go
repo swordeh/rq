@@ -14,6 +14,8 @@ func TestCheckExtensionIsAllowed(t *testing.T) {
 		{"file.mp4", true},
 		{"file.jpg", true},
 		{"file.exe", false},
+		{"file.sh", false},
+		{"file", false},
 	}
 
 	for _, tt := range tests {
