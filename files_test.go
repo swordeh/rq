@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io"
+	"reflect"
 	"testing"
 )
 
@@ -28,4 +31,40 @@ func TestCheckExtensionIsAllowed(t *testing.T) {
 		})
 	}
 
+}
+
+func TestStoreFile(t *testing.T) {
+
+	data := []byte("test file")
+	reader := bytes.NewReader(data)
+
+	type args struct {
+		filename string
+		file     io.Reader
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    StoredFile
+		wantErr bool
+	}{
+		{
+			name:    "good video",
+			args:    args{filename: "test.mp4", file: reader},
+			want:    StoredFile{UPLOAD_DIR + "/test.mp4"},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := StoreFile(tt.args.filename, tt.args.file)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("StoreFile() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("StoreFile() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
