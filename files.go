@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"mime/multipart"
 	"os"
 	"regexp"
 )
@@ -33,7 +32,7 @@ func CheckExtensionIsAllowed(filename string) bool {
 
 }
 
-func StoreFile(filename string, file multipart.File) (StoredFile, error) {
+func StoreFile(filename string, file io.Reader) (StoredFile, error) {
 
 	path := fmt.Sprintf("%v/%v", UPLOAD_DIR, filename)
 	out, err := os.Create(path)
