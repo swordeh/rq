@@ -9,7 +9,7 @@ import (
 )
 
 type StoredFile struct {
-	Filename string
+	Filename string `json:"filename"`
 }
 
 // TODO: move into config file
