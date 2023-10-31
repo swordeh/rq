@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -32,7 +33,12 @@ func CheckExtensionIsAllowed(filename string) bool {
 
 }
 
-func StoreFile(filename string, file io.Reader) (StoredFile, error) {
+func StoreFile(filename string, sourceFileName string, file io.Reader) (StoredFile, error) {
+
+	fileExtOk := CheckExtensionIsAllowed(sourceFileName)
+	if !fileExtOk {
+		return StoredFile{}, errors.New("Invalid file extension.")
+	}
 
 	path := fmt.Sprintf("%v/%v", UPLOAD_DIR, filename)
 	out, err := os.Create(path)
