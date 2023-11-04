@@ -13,6 +13,8 @@ type StoredFile struct {
 	Filename string `json:"filename"`
 }
 
+var FileExtError = errors.New("invalid file extension")
+
 // TODO: move into config file
 const UPLOAD_DIR = "/Users/sam/rq-uploads"
 const PERMITTED_FILE_EXTENSIONS = "mp4|jpg" // extensions are seperated by pipes for use in a regex string
@@ -37,7 +39,7 @@ func StoreFile(filename string, sourceFileName string, file io.Reader) (StoredFi
 
 	fileExtOk := CheckExtensionIsAllowed(sourceFileName)
 	if !fileExtOk {
-		return StoredFile{}, errors.New("Invalid file extension.")
+		return StoredFile{}, FileExtError
 	}
 
 	path := fmt.Sprintf("%v/%v", UPLOAD_DIR, filename)

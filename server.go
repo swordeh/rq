@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"io"
@@ -48,8 +49,18 @@ func QueueMediaHandler(w http.ResponseWriter, req *http.Request) {
 	dstFileName := rq.RqId
 	sf, err := StoreFile(dstFileName, srcFileName, file)
 	if err != nil {
-		errMsg := fmt.Sprintf("Failed to save file: %v", err.Error())
-		ReturnHTTPErrorResponse(w, errMsg, http.StatusInternalServerError)
+		var errMsg string
+		var responseCode int
+		switch {
+		case errors.Is(err, FileExtError):
+			errMsg = fmt.Sprintf("Failed to save file: %v", err.Error())
+			responseCode = http.StatusBadRequest
+		default:
+			errMsg = fmt.Sprintf("Server errror saving file")
+			responseCode = http.StatusInternalServerError
+		}
+
+		ReturnHTTPErrorResponse(w, errMsg, responseCode)
 		return
 	}
 
