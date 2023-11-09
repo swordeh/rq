@@ -1,0 +1,13 @@
+name: Merging into main branch
+on:
+  pull_request:
+    branches:
+      - main
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+    run:
+      - go test

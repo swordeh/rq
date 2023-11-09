@@ -6,7 +6,7 @@ FROM golang:1.21
 WORKDIR /app
 
 # Download Go modules, if any
-COPY go.mod ./
+COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy the source code. Note the slash at the end, as explained in
