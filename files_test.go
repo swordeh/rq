@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"testing"
 )
 
@@ -63,6 +65,12 @@ func TestStoreFile(t *testing.T) {
 			err := StoreFile(tt.args.filename, tt.args.sourceFilename, tt.args.file)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("StoreFile() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			// Check the function behaved and actually created the file.
+			absoluteFilePath := fmt.Sprintf("%v/%v", UPLOAD_DIR, tt.args.filename)
+			if _, err = os.Stat(absoluteFilePath); errors.Is(err, os.ErrNotExist) {
+				t.Errorf("StoreFile() error = %v", err)
 				return
 			}
 		})
