@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"reflect"
 	"testing"
 )
 
@@ -46,31 +45,25 @@ func TestStoreFile(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    StoredFile
 		wantErr bool
 	}{
 		{
 			name:    "good video",
 			args:    args{filename: "test.mp4", sourceFilename: "file.mp4", file: reader},
-			want:    StoredFile{UPLOAD_DIR + "/test.mp4"},
 			wantErr: false,
 		},
 		{
 			name:    "bad video",
 			args:    args{filename: "test.mp4", sourceFilename: "file.exe", file: reader},
-			want:    StoredFile{},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := StoreFile(tt.args.filename, tt.args.sourceFilename, tt.args.file)
+			err := StoreFile(tt.args.filename, tt.args.sourceFilename, tt.args.file)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("StoreFile() error = %v, wantErr %v", err, tt.wantErr)
 				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("StoreFile() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

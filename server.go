@@ -15,8 +15,7 @@ type ErrorResponse struct {
 }
 
 type RqRequest struct {
-	RqId string     `json:"id"`
-	File StoredFile `json:"file"`
+	RqId string `json:"id"`
 }
 
 // ReturnHTTPError returns an ErrorResponse back to the client if a request has failed.
@@ -47,7 +46,7 @@ func QueueMediaHandler(w http.ResponseWriter, req *http.Request) {
 
 	srcFileName := headers.Filename
 	dstFileName := rq.RqId
-	sf, err := StoreFile(dstFileName, srcFileName, file)
+	err = StoreFile(dstFileName, srcFileName, file)
 	if err != nil {
 		var errMsg string
 		var responseCode int
@@ -64,9 +63,6 @@ func QueueMediaHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	log.Println("File saved: ", sf)
-
-	rq.File = sf
 	output, err := json.Marshal(rq)
 	io.WriteString(w, string(output))
 }

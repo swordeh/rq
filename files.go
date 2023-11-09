@@ -9,10 +9,6 @@ import (
 	"regexp"
 )
 
-type StoredFile struct {
-	Filename string `json:"filename"`
-}
-
 var FileExtError = errors.New("invalid file extension")
 
 // TODO: move into config file
@@ -35,11 +31,11 @@ func CheckExtensionIsAllowed(filename string) bool {
 
 }
 
-func StoreFile(filename string, sourceFileName string, file io.Reader) (StoredFile, error) {
+func StoreFile(filename string, sourceFileName string, file io.Reader) error {
 
 	fileExtOk := CheckExtensionIsAllowed(sourceFileName)
 	if !fileExtOk {
-		return StoredFile{}, FileExtError
+		return FileExtError
 	}
 
 	path := fmt.Sprintf("%v/%v", UPLOAD_DIR, filename)
@@ -47,16 +43,14 @@ func StoreFile(filename string, sourceFileName string, file io.Reader) (StoredFi
 
 	if err != nil {
 		log.Printf("Local file creation failed: %v", err)
-		return StoredFile{}, err
+		return err
 	}
 
 	_, err = io.Copy(out, file)
 	if err != nil {
 		log.Println("Local file copy failed: ", err)
-		return StoredFile{}, err
+		return err
 	}
 
-	stored := StoredFile{Filename: path}
-
-	return stored, nil
+	return nil
 }
