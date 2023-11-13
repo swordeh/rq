@@ -29,12 +29,16 @@ func LoadConfigFile(profile string) error {
 	// map of config profiles which can exist within one file
 	configs := map[string]RqConfig{}
 
-	fmt.Println("Unmarshal ", configPath)
 	if err := json.Unmarshal(configFile, &configs); err != nil {
 		return err
 	}
 
-	config = configs[profile]
+	configValue, ok := configs[profile]
+	if !ok {
+		err := fmt.Errorf("config profile not found: %s", profile)
+		return err
+	}
+	config = configValue
 	return nil
 
 }
