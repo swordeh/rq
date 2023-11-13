@@ -23,16 +23,12 @@ func LoadConfigFile(profile string) error {
 		return err
 	}
 	configPath := fmt.Sprintf("%v/%v", exeDir, "config.json")
-
 	configFile, err := os.ReadFile(configPath)
-
 	// map of config profiles which can exist within one file
 	configs := map[string]RqConfig{}
-
 	if err := json.Unmarshal(configFile, &configs); err != nil {
 		return err
 	}
-
 	configValue, ok := configs[profile]
 	if !ok {
 		err := fmt.Errorf("config profile not found: %s", profile)
@@ -40,5 +36,4 @@ func LoadConfigFile(profile string) error {
 	}
 	config = configValue
 	return nil
-
 }
