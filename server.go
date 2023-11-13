@@ -68,7 +68,10 @@ func QueueMediaHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
-
+	// TODO: Move profile selection to CLI arg / env var
+	if err := LoadConfigFile("default"); err != nil {
+		log.Fatal("Could not load config file", err)
+	}
 	http.HandleFunc("/api/rq/request", QueueMediaHandler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 
