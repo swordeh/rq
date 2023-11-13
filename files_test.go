@@ -10,7 +10,7 @@ import (
 )
 
 func TestCheckExtensionIsAllowed(t *testing.T) {
-
+	config.PermittedFileExtensions = "mp4|jpg"
 	var tests = []struct {
 		filename string
 		want     bool
@@ -35,6 +35,7 @@ func TestCheckExtensionIsAllowed(t *testing.T) {
 }
 
 func TestStoreFile(t *testing.T) {
+	config.UploadDirectory, _ = os.Getwd() // Look at using os.Executable() instead
 
 	data := []byte("test file")
 	reader := bytes.NewReader(data)
@@ -68,7 +69,7 @@ func TestStoreFile(t *testing.T) {
 				return
 			}
 			// Check the function behaved and actually created the file.
-			absoluteFilePath := fmt.Sprintf("%v/%v", UPLOAD_DIR, tt.args.filename)
+			absoluteFilePath := fmt.Sprintf("%v/%v", config.UploadDirectory, tt.args.filename)
 			if _, err = os.Stat(absoluteFilePath); errors.Is(err, os.ErrNotExist) {
 				t.Errorf("StoreFile() error = %v", err)
 				return

@@ -11,16 +11,11 @@ import (
 
 var FileExtError = errors.New("invalid file extension")
 
-// TODO: move into config file
-const UPLOAD_DIR = "/Users/sam/rq-uploads"
-const PERMITTED_FILE_EXTENSIONS = "mp4|jpg" // extensions are seperated by pipes for use in a regex string
-
 // CheckExtensionIsAllowed checks to see if the filename supplied is an acceptable format,
 // and returns a boolean to represent
 func CheckExtensionIsAllowed(filename string) bool {
-
 	match := false
-	exp := fmt.Sprintf(".*\\.(%v)", PERMITTED_FILE_EXTENSIONS)
+	exp := fmt.Sprintf(".*\\.(%v)", config.PermittedFileExtensions)
 	re := regexp.MustCompile(exp)
 
 	if re.MatchString(filename) {
@@ -38,7 +33,7 @@ func StoreFile(filename string, sourceFileName string, file io.Reader) error {
 		return FileExtError
 	}
 
-	path := fmt.Sprintf("%v/%v", UPLOAD_DIR, filename)
+	path := fmt.Sprintf("%v/%v", config.UploadDirectory, filename)
 	out, err := os.Create(path)
 
 	if err != nil {

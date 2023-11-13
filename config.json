@@ -1,0 +1,6 @@
+{
+  "default" :{
+    "permitted_file_extensions": "mp4|jpg",
+    "upload_directory": "/Users/sam/rq-uploads"
+  }
+}
