@@ -61,7 +61,7 @@ func QueueMediaHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	srcFileName := headers.Filenameq
+	srcFileName := headers.Filename
 	dstFileName := rqid
 	err = StoreFile(dstFileName, srcFileName, file)
 	if err != nil {
