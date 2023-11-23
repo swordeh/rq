@@ -12,9 +12,15 @@ import (
 // Other than the obvious, an issue with this is testing.
 var config RqConfig
 
+type RqDatabaseConfig struct {
+	Engine   string `json:"engine"`
+	Filepath string `json:"filepath"`
+}
+
 type RqConfig struct {
-	PermittedFileExtensions string `json:"permitted_file_extensions"`
-	UploadDirectory         string `json:"upload_directory"`
+	PermittedFileExtensions string           `json:"permitted_file_extensions"`
+	UploadDirectory         string           `json:"upload_directory"`
+	Database                RqDatabaseConfig `json:"database"`
 }
 
 func LoadConfigFile(profile string) error {
