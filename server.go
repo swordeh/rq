@@ -84,19 +84,41 @@ func QueueMediaHandler(w http.ResponseWriter, req *http.Request) {
 	io.WriteString(w, string(output))
 }
 
+func QueueHttpHandler(w http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case http.MethodGet:
+		io.WriteString(w, http.MethodGet)
+	case http.MethodPost:
+		io.WriteString(w, http.MethodPost)
+	case http.MethodPatch:
+		io.WriteString(w, http.MethodPatch)
+	default:
+		errMsg := fmt.Sprintf("Method %v not currently supported.", req.Method)
+		ReturnHTTPErrorResponse(w, errMsg, http.StatusNotImplemented)
+	}
+	return
+}
+
 func main() {
 	// TODO: Move profile selection to CLI arg / env var
 	if err := LoadConfigFile("default"); err != nil {
 		log.Fatal("Could not load config file", err)
 	}
 
+	if err := OpenDatabase(); err != nil {
+		log.Fatal("error opening database connection: ", err)
+	}
+
 	mux := http.NewServeMux()
 
 	MediaRequestHandler := http.HandlerFunc(QueueMediaHandler)
+	HttpRequestHandler := http.HandlerFunc(QueueHttpHandler)
+
 	mux.Handle("/api/rq/request", RqHttpMiddleware(MediaRequestHandler))
+	mux.Handle("/api/rq/http", RqHttpMiddleware(HttpRequestHandler))
 
 	//http.HandleFunc("/api/rq/request", QueueMediaHandler)
-	//htto.HandleFunc("/api/rq/http", HttpOnlyHandler)
+	//htto.HandleFunc("/	api/rq/http", HttpOnlyHandler)
 	log.Fatal(http.ListenAndServe(":8080", mux))
 
 }
