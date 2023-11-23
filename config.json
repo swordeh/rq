@@ -1,6 +1,10 @@
 {
   "default" :{
     "permitted_file_extensions": "mp4|jpg",
-    "upload_directory": "/Users/sam/rq-uploads"
+    "upload_directory": "/Users/sam/rq-uploads",
+    "database" : {
+      "engine": "sqlite",
+      "filepath": "db.sqlite"
+    }
   }
 }
