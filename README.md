@@ -39,6 +39,32 @@ RQ is usually installed locally on a networked device or server. RQ works best w
 
 ## API Reference
 
+### HTTP Requests
+The following fields can be processed by RQ, depending on the type of request being made.
+
+| Field | Description                    | Required |
+|-------|--------------------------------|----------|
+| url   | The URL to make the request to | Yes      |
+| file  | The file to be sent to `url`   | Optional |
+
+The HTTP Method used in the request to RQ will in turn be the method used in the future request to `url`.
+
+The following HTTP Methods are supported:
+* GET
+* POST
+* PATCH
+
+#### GET
+
+```http request
+GET /api/rq/http
+```
+
+```sh
+curl -F 'url=https://imagination.com' http://localhost:8080/api/rq/http
+```
+
+### HTTP Media Requests
 #### Enqueue a Media Request
 
 ```http
