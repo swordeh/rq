@@ -54,18 +54,10 @@ The following HTTP Methods are supported:
 * POST
 * PATCH
 
-#### GET
+#### POST
 
-```http request
-GET /api/rq/http
-```
 
-```sh
-curl -F 'url=https://imagination.com' http://localhost:8080/api/rq/http
-```
-
-### HTTP Media Requests
-#### Enqueue a Media Request
+#### Enqueue a Request
 
 ```http
   POST /api/rq/request
