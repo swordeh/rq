@@ -8,14 +8,6 @@ import (
 
 var db *gorm.DB
 
-type RqRecord struct {
-	gorm.Model
-	RqId   string
-	Method string
-	Url    string
-	Error  string
-}
-
 func OpenDatabase() error {
 	switch config.Database.Engine {
 	case "sqlite":
