@@ -65,7 +65,7 @@ func TestStoreFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := StoreFile(tt.args.filename, tt.args.sourceFilename, tt.args.file)
-			fmt.Println("Error != nil is ", err != nil, "and tt.wantErr is ", tt.wantErr, "and if statement is", (err != nil) != tt.wantErr)
+			//fmt.Println("Error != nil is ", err != nil, "and tt.wantErr is ", tt.wantErr, "and if statement is", (err != nil) != tt.wantErr)
 
 			// If (there is an error present) that is != to what we tt.wantErr
 			if (err != nil) != tt.wantErr {
@@ -79,6 +79,8 @@ func TestStoreFile(t *testing.T) {
 					t.Errorf("StoreFile() error = %v", err)
 					return
 				}
+				// remove test file
+				os.Remove(absoluteFilePath)
 			}
 
 		})
