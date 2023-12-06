@@ -5,6 +5,9 @@
     "database" : {
       "engine": "sqlite",
       "filepath": "db.sqlite"
+    },
+    "server": {
+      "allowed_content_types": ["application/x-www-form-urlencoded", "multipart/form-data", "application/json"]
     }
   }
 }
