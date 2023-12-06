@@ -2,15 +2,18 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 )
 
 type RqRecord struct {
-	Id          string `json:"id"`
-	Method      string `json:"method"`
-	ContentType string `json:"content_type"`
-	Url         string `json:"url"`
-	Payload     string `json:"payload"`
-	Error       string `json:"error"`
+	Id          string          `json:"id"`
+	Method      string          `json:"method"`
+	ContentType string          `json:"content_type"`
+	Headers     json.RawMessage `json:"headers"`
+	Url         string          `json:"url"`
+	FileKeys    string          `json:"file_keys"`
+	Payload     json.RawMessage `json:"payload"`
+	Error       string          `json:"error"`
 }
 
 func (rr *RqRecord) Build(ctx context.Context, url string, method string) error {
