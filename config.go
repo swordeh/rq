@@ -12,6 +12,11 @@ import (
 // Other than the obvious, an issue with this is testing.
 var config RqConfig
 
+type RqServerConfig struct {
+	ExcludedHeaders     []string `json:"excluded_headers"`
+	AllowedContentTypes []string `json:"allowed_content_types"`
+}
+
 type RqDatabaseConfig struct {
 	Engine   string `json:"engine"`
 	Filepath string `json:"filepath"`
@@ -21,6 +26,7 @@ type RqConfig struct {
 	PermittedFileExtensions string           `json:"permitted_file_extensions"`
 	UploadDirectory         string           `json:"upload_directory"`
 	Database                RqDatabaseConfig `json:"database"`
+	Server                  RqServerConfig   `json:"server"`
 }
 
 func LoadConfigFile(profile string) error {
