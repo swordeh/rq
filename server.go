@@ -105,14 +105,29 @@ func QueueHttpHandler(w http.ResponseWriter, req *http.Request) {
 
 	case http.MethodPost:
 
-		// Parse the content type header
+		/*
+			Headers
+
+			Headers are passed to the onwards API from both the Request Headers
+
+			The following request headers will automatically be removed to the request:
+				* Content-Length
+				* Accept
+				* User-Agent
+				* Content-Length (Stored as a separate field)
+
+			Additional headers will automatically be passed on, unless excluded in config.
+
+		*/
+
 		mediaType, _, err := mime.ParseMediaType(contentTypeHeader)
 		if err != nil {
-			errMsg := fmt.Sprintf("error understanding content-type: %v", err)
+			errMsg := fmt.Sprintf("error parsing Content-Type: %v", err)
 			ReturnHTTPErrorResponse(w, errMsg, http.StatusInternalServerError)
 			return
 		}
 
+		// Check if content-type sent matches list of allowed types and reject if not
 		if contains(config.Server.AllowedContentTypes, mediaType) == false {
 			ReturnHTTPErrorResponse(w, "No or unsupported Content-Type supplied", http.StatusBadRequest)
 			return
@@ -124,6 +139,29 @@ func QueueHttpHandler(w http.ResponseWriter, req *http.Request) {
 			ReturnHTTPErrorResponse(w, "no content-type supplied", http.StatusBadRequest)
 			return
 		}
+
+		headers := map[string][]string{}
+		serverExcludedHeaders := []string{"Content-Length", "User-Agent", "Content-Type", "Accept"}
+
+		for _, key := range serverExcludedHeaders {
+			if contains(config.Server.ExcludedHeaders, key) == false {
+				config.Server.ExcludedHeaders = append(config.Server.ExcludedHeaders, key)
+			}
+		}
+
+		//// Add default excluded headers if config does not already contain them
+		//if len(config.Server.ExcludedHeaders) == 0 {
+		//	config.Server.ExcludedHeaders = append(config.Server.ExcludedHeaders, serverExcludedHeaders)
+		//}
+
+		for key, values := range req.Header {
+			if contains(config.Server.ExcludedHeaders, key) == false {
+				headers[key] = values
+			}
+		}
+
+		out, _ := json.Marshal(headers)
+		record.Headers = out
 
 		/*
 			multipart/form-data records contain binary (files) as well as alpahnumeric (payload) data
@@ -236,48 +274,11 @@ func QueueHttpHandler(w http.ResponseWriter, req *http.Request) {
 		// remove URL from stored payload, as this isn't sent onwards
 		delete(payload, "url")
 
-		out, _ := json.Marshal(payload)
+		out, _ = json.Marshal(payload)
 		record.Payload = out
 
 		// Set Content-Type on Record
 		record.ContentType = mediaType
-
-		/*
-			Headers
-
-			Headers are passed to the onwards API from both the Request Headers
-
-			The following request headers will automatically be removed to the request:
-				* Content-Length
-				* Accept
-				* User-Agent
-				* Content-Length (Stored as a separate field)
-
-			Additional headers will automatically be passed on, unless excluded in config.
-
-		*/
-		headers := map[string][]string{}
-		serverExcludedHeaders := []string{"Content-Length", "User-Agent", "Content-Type", "Accept"}
-
-		for _, key := range serverExcludedHeaders {
-			if contains(config.Server.ExcludedHeaders, key) == false {
-				config.Server.ExcludedHeaders = append(config.Server.ExcludedHeaders, key)
-			}
-		}
-
-		//// Add default excluded headers if config does not already contain them
-		//if len(config.Server.ExcludedHeaders) == 0 {
-		//	config.Server.ExcludedHeaders = append(config.Server.ExcludedHeaders, serverExcludedHeaders)
-		//}
-
-		for key, values := range req.Header {
-			if contains(config.Server.ExcludedHeaders, key) == false {
-				headers[key] = values
-			}
-		}
-
-		out, _ = json.Marshal(headers)
-		record.Headers = out
 
 		// Store in DB
 		record.Save()
