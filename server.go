@@ -73,20 +73,48 @@ func QueueHttpHandler(w http.ResponseWriter, req *http.Request) {
 		Because a GET request does not send this header, it's parsed for appropriate
 		methods only
 	*/
-
 	contentTypeHeader := req.Header.Get("Content-Type")
 
 	log.Printf("Got a %v request", req.Method)
 
 	switch req.Method {
 	case http.MethodGet:
-		io.WriteString(w, http.MethodGet)
+		querystring := req.URL.Query()
+		url := querystring.Get("url")
+
+		if url == "" {
+			errMsg := fmt.Sprintf("no url supplied")
+			ReturnHTTPErrorResponse(w, errMsg, http.StatusBadRequest)
+			return
+		}
+
+		record.Url = url
+		out, _ := json.Marshal(querystring)
+
+		record.Payload = out
+		record.Save()
+
+		rqreq := RqRequest{
+			Id:     getRqId(req),
+			Record: record,
+		}
+
+		out, _ = json.Marshal(rqreq)
+		io.WriteString(w, string(out))
+		return
+
 	case http.MethodPost:
+
 		// Parse the content type header
 		mediaType, _, err := mime.ParseMediaType(contentTypeHeader)
 		if err != nil {
 			errMsg := fmt.Sprintf("error understanding content-type: %v", err)
 			ReturnHTTPErrorResponse(w, errMsg, http.StatusInternalServerError)
+			return
+		}
+
+		if contains(config.Server.AllowedContentTypes, mediaType) == false {
+			ReturnHTTPErrorResponse(w, "No or unsupported Content-Type supplied", http.StatusBadRequest)
 			return
 		}
 
@@ -96,6 +124,7 @@ func QueueHttpHandler(w http.ResponseWriter, req *http.Request) {
 			ReturnHTTPErrorResponse(w, "no content-type supplied", http.StatusBadRequest)
 			return
 		}
+
 		/*
 			multipart/form-data records contain binary (files) as well as alpahnumeric (payload) data
 
@@ -107,46 +136,70 @@ func QueueHttpHandler(w http.ResponseWriter, req *http.Request) {
 		*/
 		if mediaType == "multipart/form-data" {
 			//TODO: Set maxMemory in config or env var?
-			if err := req.ParseMultipartForm(100000); err != nil {
+			if err := req.ParseMultipartForm(320000); err != nil {
 				errMsg := fmt.Sprintf("error parsing multipart formdata, %v", err)
 				ReturnHTTPErrorResponse(w, errMsg, http.StatusInternalServerError)
 				return
 			}
 
-			// Get the file submitted as part of the request
+			/*
+				File Handler
 
-			file, headers, err := req.FormFile("file")
-			if err != nil {
-				ReturnHTTPErrorResponse(w, "No form field with key 'file'", http.StatusBadRequest)
+				This block handles the file(s) uploaded to RQ, storing to disk and recording the
+				file key used, to be passed to the onwards API.
+
+				As req.FormFile() requires a key, RQ takes an opinionated approach to the keys provided,
+				and puts the onus on the calling service to ensure keys match the onward API requirements.
+
+				As such, a list of file keys in the request is stored and appended to the stored file name.
+			*/
+
+			if len(req.MultipartForm.File) == 0 {
+				errMsg := fmt.Sprintf("no file submitted but Content-Type %v used", mediaType)
+				ReturnHTTPErrorResponse(w, errMsg, http.StatusBadRequest)
 				return
 			}
 
-			// Store the file on disk
-			srcFileName := headers.Filename
-			dstFileName := record.Id
-			if err := StoreFile(dstFileName, srcFileName, file); err != nil {
-				var errMsg string
-				var responseCode int
-				switch {
-				case errors.Is(err, FileExtError):
-					errMsg = fmt.Sprintf("Failed to save file: %v", err.Error())
-					responseCode = http.StatusBadRequest
-				default:
-					errMsg = fmt.Sprintf("Server errror saving file")
-					responseCode = http.StatusInternalServerError
+			fileKeys := []string{}
+
+			for key, _ := range req.MultipartForm.File {
+				// Store the file on disk
+				file, fileHeaders, err := req.FormFile(key)
+				if err != nil {
+					errMsg := fmt.Sprintf("server error getting file for key: %v, %v", key, err)
+					ReturnHTTPErrorResponse(w, errMsg, 500)
+					return
 				}
+				srcFileName := fileHeaders.Filename
+				dstFileName := fmt.Sprintf("%v-%v", record.Id, key)
+				if err := StoreFile(dstFileName, srcFileName, file); err != nil {
+					var errMsg string
+					var responseCode int
+					switch {
+					case errors.Is(err, FileExtError):
+						errMsg = fmt.Sprintf("Check file extension: %v", err.Error())
+						responseCode = http.StatusBadRequest
+					default:
+						errMsg = fmt.Sprintf("Server errror saving file")
+						responseCode = http.StatusInternalServerError
+					}
 
-				ReturnHTTPErrorResponse(w, errMsg, responseCode)
-				return
+					ReturnHTTPErrorResponse(w, errMsg, responseCode)
+					return
+				}
+				// TODO: Record key names into db
+				fileKeys = append(fileKeys, key)
+
 			}
-
+			out, _ := json.Marshal(fileKeys)
+			record.FileKeys = string(out)
 		}
+
 		/*
 			application/x-www-form-urlencoded records are alphanumeric
 
 			curl -v -d "url=https://imagination.com" -X POST http://localhost:8080/api/rq/http
 		*/
-
 		if mediaType == "application/x-www-form-urlencoded" {
 			//TODO: Set maxMemory in config or env var?
 			if err := req.ParseForm(); err != nil {
@@ -154,55 +207,92 @@ func QueueHttpHandler(w http.ResponseWriter, req *http.Request) {
 				ReturnHTTPErrorResponse(w, errMsg, http.StatusInternalServerError)
 				return
 			}
-			/*
-
-				Map the url.Values into a payload, to be marshalled into JSON.
-
-				Where multiple values are sent for the same key, the library adds them all to a slice.
-				We could store this as a plain string, but a JSON object makes sense right now.
-
-				> curl -v -d "url=https://img.com&likes=stuff&likes=things" -X POST http://localhost:8080/api/rq/http
-				< {"likes":["stuff","things"],"url":["https://img.com"]}
-			*/
-
-			payload := map[string][]string{}
-			for x, y := range req.Form {
-				payload[x] = y
-			}
-
-			out, _ := json.Marshal(payload)
-			record.Payload = string(out)
 
 		}
 
-		//Get URL from Form and set it on RqRecord
 		url := req.Form.Get("url")
 		if url == "" {
 			errMsg := fmt.Sprintf("no URL provided")
 			ReturnHTTPErrorResponse(w, errMsg, http.StatusBadRequest)
+			return
 		}
 		record.Url = url
 
-		// Set Content-Type on Record
+		/*
 
+			Map the url.Values into a payload, to be marshalled into JSON.
+
+			Where multiple values are sent for the same key, the library adds them all to a slice.
+			We could store this as a plain string, but a JSON object makes sense right now.
+
+			> curl -v -d "url=https://img.com&likes=stuff&likes=things" -X POST http://localhost:8080/api/rq/http
+			< {"likes":["stuff","things"],"url":["https://img.com"]}
+		*/
+		payload := map[string][]string{}
+		for key, values := range req.Form {
+			payload[key] = values
+		}
+
+		// remove URL from stored payload, as this isn't sent onwards
+		delete(payload, "url")
+
+		out, _ := json.Marshal(payload)
+		record.Payload = out
+
+		// Set Content-Type on Record
 		record.ContentType = mediaType
+
+		/*
+			Headers
+
+			Headers are passed to the onwards API from both the Request Headers
+
+			The following request headers will automatically be removed to the request:
+				* Content-Length
+				* Accept
+				* User-Agent
+				* Content-Length (Stored as a separate field)
+
+			Additional headers will automatically be passed on, unless excluded in config.
+
+		*/
+		headers := map[string][]string{}
+		serverExcludedHeaders := []string{"Content-Length", "User-Agent", "Content-Type", "Accept"}
+
+		for _, key := range serverExcludedHeaders {
+			if contains(config.Server.ExcludedHeaders, key) == false {
+				config.Server.ExcludedHeaders = append(config.Server.ExcludedHeaders, key)
+			}
+		}
+
+		//// Add default excluded headers if config does not already contain them
+		//if len(config.Server.ExcludedHeaders) == 0 {
+		//	config.Server.ExcludedHeaders = append(config.Server.ExcludedHeaders, serverExcludedHeaders)
+		//}
+
+		for key, values := range req.Header {
+			if contains(config.Server.ExcludedHeaders, key) == false {
+				headers[key] = values
+			}
+		}
+
+		out, _ = json.Marshal(headers)
+		record.Headers = out
 
 		// Store in DB
 		record.Save()
-		//	errMsg := fmt.Sprintf("error saving to database ", err)
-		//	ReturnHTTPErrorResponse(w, errMsg, http.StatusInternalServerError)
-		//	return
-		//}
 
 		// Return representation
-
 		rqreq := RqRequest{
 			Id:     getRqId(req),
 			Record: record,
 		}
 
-		out, _ := json.Marshal(rqreq)
+		out, _ = json.Marshal(rqreq)
 		io.WriteString(w, string(out))
+
+		return
+
 	case http.MethodPatch:
 		io.WriteString(w, http.MethodPatch)
 	default:
@@ -212,6 +302,17 @@ func QueueHttpHandler(w http.ResponseWriter, req *http.Request) {
 	return
 }
 
+// contains iterates through a slice to check for the presence of str
+func contains(slice []string, str string) bool {
+	for _, s := range slice {
+		if s == str {
+			return true
+		}
+	}
+	return false
+}
+
+// getRqId returns the RQ ID from the Request's Context
 func getRqId(req *http.Request) string {
 	rqidCtx := req.Context().Value("rqid")
 	rqid := fmt.Sprint(rqidCtx)
