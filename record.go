@@ -34,6 +34,19 @@ func (rr *RqRecord) Build(ctx context.Context, url string, method string) error 
 	return nil
 }
 
+func (rr *RqRecord) SetHeaders(requestHeaders map[string][]string) {
+	headers := map[string][]string{}
+	for key, values := range requestHeaders {
+		// If the request header is not in the excluded list, add to the record map
+		if contains(config.Server.ExcludedHeaders, key) == false {
+			headers[key] = values
+		}
+	}
+
+	out, _ := json.Marshal(headers)
+	rr.Headers = out
+}
+
 func (rr *RqRecord) Save() {
 	db.Create(&rr)
 }
