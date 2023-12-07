@@ -45,15 +45,9 @@ func GenerateRequestId() string {
 	return uuid.New().String()
 }
 
-//func HttpOnlyHandler(w http.ResponseWriter, req *http.Request) {
-//	req.Context()
-//	rqid := GenerateRequestId()
-//	rq := RqRequest{
-//		RqId: rqid,
-//	}
-//}
-
 func QueueHttpHandler(w http.ResponseWriter, req *http.Request) {
+
+	defer req.Body.Close()
 
 	// Build up an RqRecord based on what we know so far.
 
@@ -62,6 +56,8 @@ func QueueHttpHandler(w http.ResponseWriter, req *http.Request) {
 		Method: req.Method,
 		Error:  "",
 	}
+
+	addServerExcludedHeaders()
 
 	/*
 		Content-Type can vary, depending on the type of POST.
@@ -127,41 +123,11 @@ func QueueHttpHandler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		// Check if content-type sent matches list of allowed types and reject if not
-		if contains(config.Server.AllowedContentTypes, mediaType) == false {
-			ReturnHTTPErrorResponse(w, "No or unsupported Content-Type supplied", http.StatusBadRequest)
-			return
+		if err = validateContentType(mediaType); err != nil {
+			ReturnHTTPErrorResponse(w, err.Error(), http.StatusBadRequest)
 		}
 
-		// This in theory never happens
-		if mediaType == "" {
-			log.Println("media type not set")
-			ReturnHTTPErrorResponse(w, "no content-type supplied", http.StatusBadRequest)
-			return
-		}
-
-		headers := map[string][]string{}
-		serverExcludedHeaders := []string{"Content-Length", "User-Agent", "Content-Type", "Accept"}
-
-		for _, key := range serverExcludedHeaders {
-			if contains(config.Server.ExcludedHeaders, key) == false {
-				config.Server.ExcludedHeaders = append(config.Server.ExcludedHeaders, key)
-			}
-		}
-
-		//// Add default excluded headers if config does not already contain them
-		//if len(config.Server.ExcludedHeaders) == 0 {
-		//	config.Server.ExcludedHeaders = append(config.Server.ExcludedHeaders, serverExcludedHeaders)
-		//}
-
-		for key, values := range req.Header {
-			if contains(config.Server.ExcludedHeaders, key) == false {
-				headers[key] = values
-			}
-		}
-
-		out, _ := json.Marshal(headers)
-		record.Headers = out
+		record.SetHeaders(req.Header)
 
 		/*
 			multipart/form-data records contain binary (files) as well as alpahnumeric (payload) data
@@ -274,7 +240,7 @@ func QueueHttpHandler(w http.ResponseWriter, req *http.Request) {
 		// remove URL from stored payload, as this isn't sent onwards
 		delete(payload, "url")
 
-		out, _ = json.Marshal(payload)
+		out, _ := json.Marshal(payload)
 		record.Payload = out
 
 		// Set Content-Type on Record
@@ -301,6 +267,33 @@ func QueueHttpHandler(w http.ResponseWriter, req *http.Request) {
 		ReturnHTTPErrorResponse(w, errMsg, http.StatusNotImplemented)
 	}
 	return
+}
+
+func validateContentType(mediaType string) error {
+
+	// Check if content-type is not in allowed list
+	if contains(config.Server.AllowedContentTypes, mediaType) == false {
+		return errors.New("no or unsupported Content-Type supplied")
+	}
+
+	// This in theory never happens
+	if mediaType == "" {
+		return errors.New("no content-type supplied")
+	}
+
+	return nil
+
+}
+
+func addServerExcludedHeaders() {
+
+	serverExcludedHeaders := []string{"Content-Length", "User-Agent", "Content-Type", "Accept"}
+
+	for _, key := range serverExcludedHeaders {
+		if contains(config.Server.ExcludedHeaders, key) == false {
+			config.Server.ExcludedHeaders = append(config.Server.ExcludedHeaders, key)
+		}
+	}
 }
 
 // contains iterates through a slice to check for the presence of str
