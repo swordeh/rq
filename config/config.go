@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 // We're using global state here only for config, so we don't have to access
 // the file over and over, and can share the state across different parts of the app.
 // Other than the obvious, an issue with this is testing.
-var config RqConfig
+var Config RqConfig
 
 type RqServerConfig struct {
 	ExcludedHeaders     []string `json:"excluded_headers"`
@@ -46,6 +46,6 @@ func LoadConfigFile(profile string) error {
 		err := fmt.Errorf("config profile not found: %s", profile)
 		return err
 	}
-	config = configValue
+	Config = configValue
 	return nil
 }
