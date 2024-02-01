@@ -178,8 +178,17 @@ func (rs *RecordServer) HandleFormMethod(req *http.Request, record *records.RqRe
 		return err
 	}
 
-	// Set Payload
-	rs.HandlePayload(req, record)
+	// Process payload for application/json requests
+	if mediaType == "application/json" {
+		rs.HandleJsonPayload(req, record)
+	} else {
+		// Handle request payloads included in req.Form
+		rs.HandlePayload(req, record)
+		// Get URL
+		if err := rs.HandleFormUrl(req, record); err != nil {
+			return err
+		}
+	}
 
 	// Save Headers to Record
 	record.SetHeaders(req.Header)
@@ -272,28 +281,36 @@ func (rs *RecordServer) HandleMediaType(mediaType string, req *http.Request, rec
 
 	}
 
-	if mediaType == "application/json" {
-		body := map[string]json.RawMessage{}
-		out, _ := io.ReadAll(req.Body)
-		json.Unmarshal(out, &body)
-		return nil
-	} else {
-
-		url := req.Form.Get("url")
-		fmt.Println(req.Form)
-		if url == "" {
-			errMsg := fmt.Sprintf("no URL provided")
-			return StatusError{
-				StatusCode: http.StatusBadRequest,
-				Err:        errors.New(errMsg),
-			}
-		}
-		record.Url = url
-	}
-
 	// Set Content-Type on Record
 	record.ContentType = mediaType
 	return nil
+}
+
+// HandleFormUrl is used for media upload requests where the URL can be provided as a form field.
+func (rs *RecordServer) HandleFormUrl(req *http.Request, record *records.RqRecord) error {
+	url := req.Form.Get("url")
+	if url == "" {
+		errMsg := fmt.Sprintf("no URL provided")
+		return StatusError{
+			StatusCode: http.StatusBadRequest,
+			Err:        errors.New(errMsg),
+		}
+	}
+	// Set URL
+	record.Url = url
+	return nil
+}
+
+// HandleJsonUrl is used specifically for application/json requests, where the URL must be provided as a Header
+// rather than a Form field, using the key X-RqUrl
+func (rs *RecordServer) HandleJsonUrl(req *http.Request, record *records.RqRecord) error {
+	if url := req.Header.Get("X-RqUrl"); url != "" {
+		errMsg := fmt.Sprintf("no URL provided")
+		return StatusError{
+			StatusCode: http.StatusBadRequest,
+			Err:        errors.New(errMsg),
+		}
+	}
 }
 
 // HandlePayload takes all submitted form key value pairs in the http.Request and saves them to the records.RqRecord
@@ -308,6 +325,14 @@ func (rs *RecordServer) HandlePayload(req *http.Request, record *records.RqRecor
 	delete(payload, "url")
 
 	out, _ := json.Marshal(payload)
+	record.Payload = out
+}
+
+func (rs *RecordServer) HandleJsonPayload(req *http.Request, record *records.RqRecord) {
+	body := map[string]json.RawMessage{}
+	out, _ := io.ReadAll(req.Body)
+	json.Unmarshal(out, &body)
+
 	record.Payload = out
 }
 
