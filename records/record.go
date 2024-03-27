@@ -19,6 +19,7 @@ type RqRecord struct {
 
 type RecordStore interface {
 	Add(record RqRecord) error
+	Get(id string) (*RqRecord, error)
 }
 
 // SetHeaders takes the headers from the request and adds to the Record , providing they are not in the config's
