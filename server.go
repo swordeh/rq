@@ -66,6 +66,7 @@ func (rs *RecordServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 
 	case http.MethodGet:
+
 		querystring := req.URL.Query()
 		url := querystring.Get("url")
 
@@ -92,34 +93,8 @@ func (rs *RecordServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 
-	case http.MethodPost:
-		err := rs.HandleFormMethod(req, &record)
-		if err != nil {
-			switch e := err.(type) {
-			case HttpError:
-				ReturnHTTPErrorResponse(w, err.Error(), e.Status())
-				return
-			default:
-				ReturnHTTPErrorResponse(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		}
-
-	case http.MethodPatch:
-		err := rs.HandleFormMethod(req, &record)
-		if err != nil {
-			switch e := err.(type) {
-			case HttpError:
-				ReturnHTTPErrorResponse(w, err.Error(), e.Status())
-				return
-			default:
-				ReturnHTTPErrorResponse(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		}
-
-	case http.MethodPut:
-		err := rs.HandleFormMethod(req, &record)
+	case http.MethodPost, http.MethodPatch, http.MethodPut:
+		err := rs.HandleRequest(req, &record)
 		if err != nil {
 			switch e := err.(type) {
 			case HttpError:
@@ -143,14 +118,17 @@ func (rs *RecordServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 }
 
-func (rs *RecordServer) HandleFormMethod(req *http.Request, record *records.RqRecord) error {
+// HandleRequest processes the request made, validates it, saves media and builds up the record to be stored.
+func (rs *RecordServer) HandleRequest(req *http.Request, record *records.RqRecord) error {
 
 	// Get RqId
 	rqId := getRqId(req)
 
+	// Log request
+	log.Printf("%v: Got a %v request", rqId, req.Method)
+
 	// Get the Content-Type full header
 	contentTypeHeader := req.Header.Get("Content-Type")
-	log.Printf("%v: Got a %v request", rqId, req.Method)
 
 	// Get the Content-Type parsed value
 	mediaType, _, err := mime.ParseMediaType(contentTypeHeader)
@@ -173,21 +151,29 @@ func (rs *RecordServer) HandleFormMethod(req *http.Request, record *records.RqRe
 	}
 
 	// Content-Type specific implementation
-	err = rs.HandleMediaType(mediaType, req, record)
-	if err != nil {
+	if err = rs.HandleMediaType(mediaType, req, record); err != nil {
 		return err
+	}
+
+	// Process GET Payloads
+	if req.Method == http.MethodGet {
+		// Handle request payloads included in req.Form
+		rs.HandleQuerystringPayload(req.URL.Query(), record)
 	}
 
 	// Process payload for application/json requests
 	if mediaType == "application/json" {
-		rs.HandleJsonPayload(req, record)
-	} else {
-		// Handle request payloads included in req.Form
-		rs.HandlePayload(req, record)
-		// Get URL
-		if err := rs.HandleFormUrl(req, record); err != nil {
-			return err
-		}
+		rs.HandleJsonPayload(req.Body, record)
+	}
+
+	media_types := []string{"application/x-www-form-urlencoded", "multipart/form-data"}
+	if helpers.Contains(&media_types, mediaType) {
+		rs.HandleFormPayload(req.Form, record)
+	}
+
+	// Get URL
+	if err := rs.HandleUrl(req.URL.Query().Get("url"), record); err != nil {
+		return err
 	}
 
 	// Save Headers to Record
@@ -287,8 +273,22 @@ func (rs *RecordServer) HandleMediaType(mediaType string, req *http.Request, rec
 }
 
 // HandleFormUrl is used for media upload requests where the URL can be provided as a form field.
-func (rs *RecordServer) HandleFormUrl(req *http.Request, record *records.RqRecord) error {
-	url := req.Form.Get("url")
+//func (rs *RecordServer) HandleFormUrl(req *http.Request, record *records.RqRecord) error {
+//	url := req.Form.Get("url")
+//	if url == "" {
+//		errMsg := fmt.Sprintf("no URL provided")
+//		return StatusError{
+//			StatusCode: http.StatusBadRequest,
+//			Err:        errors.New(errMsg),
+//		}
+//	}
+//	// Set URL
+//	record.Url = url
+//	return nil
+//}
+
+// HandleUrl takes the URL from the querystring and adds to the record
+func (rs *RecordServer) HandleUrl(url string, record *records.RqRecord) error {
 	if url == "" {
 		errMsg := fmt.Sprintf("no URL provided")
 		return StatusError{
@@ -296,43 +296,33 @@ func (rs *RecordServer) HandleFormUrl(req *http.Request, record *records.RqRecor
 			Err:        errors.New(errMsg),
 		}
 	}
-	// Set URL
+
 	record.Url = url
 	return nil
 }
 
-// HandleJsonUrl is used specifically for application/json requests, where the URL must be provided as a Header
-// rather than a Form field, using the key X-RqUrl
-func (rs *RecordServer) HandleJsonUrl(req *http.Request, record *records.RqRecord) error {
-	if url := req.Header.Get("X-RqUrl"); url != "" {
-		errMsg := fmt.Sprintf("no URL provided")
-		return StatusError{
-			StatusCode: http.StatusBadRequest,
-			Err:        errors.New(errMsg),
-		}
-	}
-}
-
 // HandlePayload takes all submitted form key value pairs in the http.Request and saves them to the records.RqRecord
-func (rs *RecordServer) HandlePayload(req *http.Request, record *records.RqRecord) {
-
-	payload := map[string][]string{}
-	for key, values := range req.Form {
-		payload[key] = values
-	}
-
+func (rs *RecordServer) HandleFormPayload(form map[string][]string, record *records.RqRecord) {
 	// remove URL from stored payload, as this isn't sent onwards
-	delete(payload, "url")
+	delete(form, "url")
 
-	out, _ := json.Marshal(payload)
+	out, _ := json.Marshal(form)
 	record.Payload = out
 }
 
-func (rs *RecordServer) HandleJsonPayload(req *http.Request, record *records.RqRecord) {
-	body := map[string]json.RawMessage{}
-	out, _ := io.ReadAll(req.Body)
-	json.Unmarshal(out, &body)
+// HandleJsonPayload extracts the JSON payload from the request and sets it to the `Payload` field of the record.
+func (rs *RecordServer) HandleJsonPayload(body io.ReadCloser, record *records.RqRecord) {
+	payload := map[string]json.RawMessage{}
+	out, _ := io.ReadAll(body)
+	json.Unmarshal(out, &payload)
 
+	record.Payload = out
+}
+
+// HandleQuerystringPayload takes a querystring map and a pointer to a records.RqRecord and processes the querystring payload.
+func (rs *RecordServer) HandleQuerystringPayload(qs map[string][]string, record *records.RqRecord) {
+	delete(qs, "url")
+	out, _ := json.Marshal(qs)
 	record.Payload = out
 }
 
@@ -357,12 +347,15 @@ func (rs *RecordServer) HandleFilesInRequest(req *http.Request) (keys []string, 
 			}
 		}
 		srcFileName := fileHeaders.Filename
+		fmt.Println("Checking file extension: ", srcFileName)
 
-		fileExtOk, ext := files.CheckExtensionIsAllowed(srcFileName)
+		fileExtOk, ext := files.CheckExtensionIsAllowed(srcFileName, config.Config.PermittedFileExtensions)
+		fmt.Println("File extension is ok: ", fileExtOk, config.Config.PermittedFileExtensions)
 		if fileExtOk == false {
-			return []string{}, StatusError{
+			errMsg := fmt.Sprintf("File extension not allowed: %v", srcFileName)
+			return []string{key}, StatusError{
 				StatusCode: http.StatusBadRequest,
-				Err:        errors.New("File extension not allowed."),
+				Err:        errors.New(errMsg),
 			}
 		}
 
@@ -418,10 +411,6 @@ func ReturnHTTPErrorResponse(w http.ResponseWriter, errorMessage string, status 
 
 func GenerateRequestId() string {
 	return uuid.New().String()
-}
-
-func QueueHttpHandler(w http.ResponseWriter, req *http.Request) {
-
 }
 
 // validateContentType will validate whetheer the value for the Content-Type header value is in the allowed list
