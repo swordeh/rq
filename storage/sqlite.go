@@ -23,11 +23,13 @@ func NewSqliteRecordStore(path string) (*SqliteRecordStore, error) {
 
 }
 
-func migrateSchema() {
-
-}
-
 func (s *SqliteRecordStore) Add(record records.RqRecord) error {
 	err := s.db.Create(record).Error
 	return err
+}
+
+func (s *SqliteRecordStore) Get(id string) (*records.RqRecord, error) {
+	var record records.RqRecord
+	err := s.db.Where("id = ?", id).First(&record).Error
+	return &record, err
 }
