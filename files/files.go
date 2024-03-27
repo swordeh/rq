@@ -1,6 +1,7 @@
 package files
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -23,6 +24,7 @@ type DiskFileStore struct {
 // InMemoryFileStore is a FileStore for in-memory file storage.
 type InMemoryFileStore struct {
 	store FileStore
+	files map[string][]byte
 }
 
 // NewDiskFileStore returns a DiskFileStore stuct, for use with persistant file storage.
@@ -48,20 +50,30 @@ func (dfs *DiskFileStore) Save(filename string, contents io.Reader) error {
 
 // CheckExtensionIsAllowed checks to see if the filename supplied is an acceptable format,
 // and returns a boolean to represent
-func CheckExtensionIsAllowed(filename string) (isOk bool, extension string) {
+func CheckExtensionIsAllowed(filename string, allowedExtensionsRegex string) (isOk bool, extension string) {
 	isOk = false
 	extension = ""
-	exp := fmt.Sprintf("%v", config.Config.PermittedFileExtensions)
+	exp := fmt.Sprintf("(i?)%v", allowedExtensionsRegex)
 	re := regexp.MustCompile(exp)
 
-	filenameComponents := strings.Split(filename, ".")
-	fileNameDotExtension := filenameComponents[len(filenameComponents)-1]
+	fileExtension := strings.ToLower(filename[strings.LastIndex(filename, ".")+1:])
 
-	if re.MatchString(fileNameDotExtension) {
-		isOk = true
-		extension = fileNameDotExtension
+	return re.MatchString(fileExtension), fileExtension
+}
+
+func NewInMemoryFileStore() (*InMemoryFileStore, error) {
+	return &InMemoryFileStore{files: make(map[string][]byte)}, nil
+}
+
+func (mfs *InMemoryFileStore) Save(filename string, contents io.Reader) error {
+	if _, exists := mfs.files[filename]; exists {
+		errMsg := fmt.Sprintf("file %s already exists", filename)
+		return errors.New(errMsg)
 	}
-
-	return isOk, extension
-
+	fileContents, err := io.ReadAll(contents)
+	if err != nil {
+		return errors.New("error reading file contents")
+	}
+	mfs.files[filename] = fileContents
+	return nil
 }
