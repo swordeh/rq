@@ -434,11 +434,6 @@ func validateContentType(mediaType string) error {
 		return errors.New("no or unsupported Content-Type supplied")
 	}
 
-	// This in theory never happens
-	if mediaType == "" {
-		return errors.New("no content-type supplied")
-	}
-
 	return nil
 
 }

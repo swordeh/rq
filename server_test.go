@@ -21,6 +21,7 @@ import (
 
 func init() {
 	config.Config.PermittedFileExtensions = "mp4|jpg"
+	config.Config.Server.AllowedContentTypes = []string{"application/json"}
 }
 
 func TestHandleQuerystringPayload(t *testing.T) {
@@ -622,7 +623,7 @@ func TestValidateContentType(t *testing.T) {
 			name:       "With empty content type",
 			mediaType:  "",
 			wantErr:    true,
-			errorValue: "no content-type supplied",
+			errorValue: "no or unsupported Content-Type supplied",
 		},
 	}
 
