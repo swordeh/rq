@@ -379,6 +379,9 @@ func TestRecordServer_HandleMediaType(t *testing.T) {
 	mockRecord := &records.RqRecord{}
 	mockRecordUrlEncodedValues := &records.RqRecord{}
 
+	reqNoFiles := httptest.NewRequest(http.MethodPost, "/", nil)
+	reqNoFiles.Header.Set("Content-Type", "multipart/form-data")
+
 	// Actual tests
 	tests := []struct {
 		name    string
@@ -398,6 +401,19 @@ func TestRecordServer_HandleMediaType(t *testing.T) {
 				record:    mockRecord,
 			},
 			wantErr: false,
+		},
+		{
+			name: "a multipart upload with no data",
+			fields: fields{
+				Store:     &MockMemoryRecordStore{},
+				FileStore: mockFileStore,
+			},
+			args: args{
+				mediaType: "multipart/form-data",
+				req:       reqNoFiles,
+				record:    mockRecord,
+			},
+			wantErr: true,
 		},
 		{
 			name: "a urlencoded form",
@@ -648,4 +664,225 @@ func TestValidateContentType(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestServerExcludedHeaders(t *testing.T) {
+	tests := []struct {
+		name            string
+		input           []string
+		expectedHeaders []string
+	}{
+		{
+			name:            "Empty config headers",
+			input:           []string{},
+			expectedHeaders: []string{"Content-Length", "User-Agent", "Content-Type", "Accept"},
+		},
+		{
+			name:            "Some config headers",
+			input:           []string{"Content-Length", "User-Agent"},
+			expectedHeaders: []string{"Content-Length", "User-Agent", "Content-Type", "Accept"},
+		},
+		{
+			name:            "All server headers in config headers",
+			input:           []string{"Content-Length", "User-Agent", "Content-Type", "Accept"},
+			expectedHeaders: []string{"Content-Length", "User-Agent", "Content-Type", "Accept"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			addServerExcludedHeaders(&test.input)
+
+			if len(test.input) != len(test.expectedHeaders) {
+				t.Fatalf("Expected %d headers but got %d", len(test.expectedHeaders), len(test.input))
+			}
+
+			for i, header := range test.expectedHeaders {
+				if header != test.input[i] {
+					t.Errorf("Expected header %q but got %q", header, test.input[i])
+				}
+			}
+		})
+	}
+}
+
+func TestReturnHTTPErrorResponse(t *testing.T) {
+	tests := []struct {
+		name         string
+		errorMessage string
+		status       int
+	}{
+		{name: "InternalServerError", errorMessage: "Internal Server Error", status: http.StatusInternalServerError},
+		{name: "BadRequest", errorMessage: "Bad Request", status: http.StatusBadRequest},
+		{name: "NotFound", errorMessage: "Not Found", status: http.StatusNotFound},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			rr := httptest.NewRecorder()
+			ReturnHTTPErrorResponse(rr, test.errorMessage, test.status)
+
+			res := rr.Result()
+			defer res.Body.Close()
+
+			if status := res.StatusCode; status != test.status {
+				t.Errorf("handler returned wrong status code: got %v want %v",
+					status, test.status)
+			}
+
+			var response ErrorResponse
+			err := json.NewDecoder(res.Body).Decode(&response)
+			if err != nil {
+				t.Fatalf("could not decode error response: %v", err)
+			}
+
+			if response.Error != test.errorMessage {
+				t.Errorf("handler returned unexpected body: got %+v want %+v", response, test.errorMessage)
+			}
+		})
+	}
+}
+
+func TestHandleRequest(t *testing.T) {
+
+	tests := []struct {
+		name         string
+		mediaType    string
+		inputRequest func(mediatype string) *http.Request
+		inputRecord  records.RqRecord
+		wantErr      bool
+	}{
+		{
+			name:      "no mediatype",
+			mediaType: "",
+			inputRequest: func(mediaType string) *http.Request {
+				req := httptest.NewRequest(http.MethodGet, "/?url=https://example.com", nil)
+				return req
+			},
+			inputRecord: records.RqRecord{},
+			wantErr:     true,
+		},
+		{
+			name:      "unsupported content type",
+			mediaType: "application/octet-stream",
+			inputRequest: func(mediaType string) *http.Request {
+				req := httptest.NewRequest(http.MethodGet, "/?url=https://example.com", nil)
+				req.Header.Set("Content-Type", mediaType)
+				return req
+			},
+			inputRecord: records.RqRecord{},
+			wantErr:     true,
+		},
+		{
+			name:      "content-type application/json",
+			mediaType: "application/json ",
+			inputRequest: func(mediaType string) *http.Request {
+				req := httptest.NewRequest(http.MethodGet, "/?url=https://example.com", nil)
+				req.Header.Set("Content-Type", mediaType)
+				return req
+			},
+			inputRecord: records.RqRecord{},
+			wantErr:     false,
+		},
+		{
+			name:      "application/json",
+			mediaType: "application/json ",
+			inputRequest: func(mediaType string) *http.Request {
+				req := httptest.NewRequest(http.MethodGet, "/?url=https://example.com", nil)
+				req.Header.Set("Content-Type", mediaType)
+				return req
+			},
+			inputRecord: records.RqRecord{},
+			wantErr:     false,
+		},
+		{
+			name:      "URL encoded form but server didn't whitelist in config",
+			mediaType: "application/x-www-form-urlencoded",
+			inputRequest: func(mediaType string) *http.Request {
+				req := httptest.NewRequest(http.MethodGet, "/?url=https://example.com", nil)
+				req.Header.Set("Content-Type", mediaType)
+				return req
+			},
+			inputRecord: records.RqRecord{},
+			wantErr:     true,
+		},
+		{
+			name:      "URL encoded form",
+			mediaType: "application/x-www-form-urlencoded",
+			inputRequest: func(mediaType string) *http.Request {
+				req := httptest.NewRequest(http.MethodPost, "/?url=https://example.com", nil)
+				req.Header.Set("Content-Type", mediaType)
+				config.Config.Server.AllowedContentTypes = []string{"application/x-www-form-urlencoded"}
+				return req
+			},
+			inputRecord: records.RqRecord{},
+			wantErr:     false,
+		},
+	}
+
+	mfs, _ := files.NewInMemoryFileStore()
+	server := RecordServer{
+		Store: &MockMemoryRecordStore{
+			db: make(map[string]records.RqRecord),
+		},
+		FileStore: mfs,
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := server.HandleRequest(test.inputRequest(test.mediaType), &test.inputRecord)
+			if test.wantErr {
+				if err == nil {
+					t.Fatalf("Expected an error but got nil")
+				}
+			} else { // If no error was expected
+				if err != nil { // but we got one
+					t.Fatalf("Expected no error but got %q", err.Error())
+				}
+			}
+		})
+	}
+}
+
+func TestRecordServer_ServeHTTP(t *testing.T) {
+
+	tests := []struct {
+		name         string
+		inputRequest func(method string) *http.Request
+		method       string
+		wantCode     int
+	}{
+		{
+			name: "simple get request",
+			inputRequest: func(method string) *http.Request {
+				request := httptest.NewRequest(method, "/?url=https://www.imagination.com", nil)
+
+				return request
+			},
+			method:   http.MethodGet,
+			wantCode: 200,
+		},
+	}
+
+	mfs, _ := files.NewInMemoryFileStore()
+	server := &RecordServer{
+		Store: &MockMemoryRecordStore{
+			db: make(map[string]records.RqRecord),
+		},
+		FileStore: mfs,
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			response := httptest.NewRecorder()
+
+			// All requests run through the middleware
+			RqHttpMiddleware(server).ServeHTTP(response, test.inputRequest(test.method))
+			if test.wantCode != response.Code {
+				t.Errorf("ServeHTTP() got %v, want %v", response.Code, test.wantCode)
+			}
+		})
+	}
+
 }
