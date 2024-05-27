@@ -51,35 +51,38 @@ func (s StatusError) Status() int {
 func (rs *RecordServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 
+
 	rqId := getRqId(req)
+
+	querystring := req.URL.Query()
+	url := querystring.Get("url")
+
+	if url == "" {
+		errMsg := fmt.Sprintf("no url supplied")
+		ReturnHTTPErrorResponse(w, errMsg, http.StatusBadRequest)
+		return
+	}
+
+	// Don't create the record until the request is mildly valid
 	record := records.RqRecord{
 		Id:     rqId,
 		Method: req.Method,
 		Error:  "",
 	}
 
+	record.Url = url
+	out, _ := json.Marshal(querystring)
+
 	rqreq := RqRequest{
 		Id:     rqId,
 		Record: &record,
 	}
 
+	record.Payload = out
+
 	switch req.Method {
 
 	case http.MethodGet:
-
-		querystring := req.URL.Query()
-		url := querystring.Get("url")
-
-		if url == "" {
-			errMsg := fmt.Sprintf("no url supplied")
-			ReturnHTTPErrorResponse(w, errMsg, http.StatusBadRequest)
-			return
-		}
-
-		record.Url = url
-		out, _ := json.Marshal(querystring)
-
-		record.Payload = out
 
 		err := rs.saveRecord(record)
 		if err != nil {
@@ -111,8 +114,9 @@ func (rs *RecordServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	out, _ := json.Marshal(rqreq)
-	io.WriteString(w, string(out))
+
+	result, _ := json.Marshal(rqreq)
+	io.WriteString(w, string(result))
 
 	return
 
@@ -169,11 +173,6 @@ func (rs *RecordServer) HandleRequest(req *http.Request, record *records.RqRecor
 	media_types := []string{"application/x-www-form-urlencoded", "multipart/form-data"}
 	if helpers.Contains(&media_types, mediaType) {
 		rs.HandleFormPayload(req.Form, record)
-	}
-
-	// Get URL
-	if err := rs.HandleUrl(req.URL.Query().Get("url"), record); err != nil {
-		return err
 	}
 
 	// Save Headers to Record
@@ -272,21 +271,6 @@ func (rs *RecordServer) HandleMediaType(mediaType string, req *http.Request, rec
 	return nil
 }
 
-// HandleFormUrl is used for media upload requests where the URL can be provided as a form field.
-//func (rs *RecordServer) HandleFormUrl(req *http.Request, record *records.RqRecord) error {
-//	url := req.Form.Get("url")
-//	if url == "" {
-//		errMsg := fmt.Sprintf("no URL provided")
-//		return StatusError{
-//			StatusCode: http.StatusBadRequest,
-//			Err:        errors.New(errMsg),
-//		}
-//	}
-//	// Set URL
-//	record.Url = url
-//	return nil
-//}
-
 // HandleUrl takes the URL from the querystring and adds to the record
 func (rs *RecordServer) HandleUrl(url string, record *records.RqRecord) error {
 	if url == "" {
@@ -373,6 +357,7 @@ func (rs *RecordServer) HandleFilesInRequest(req *http.Request) (keys []string, 
 
 	}
 	return fileKeys, nil
+
 }
 
 func (rs *RecordServer) saveRecord(record records.RqRecord) error {
@@ -404,7 +389,6 @@ func RqHttpMiddleware(next http.Handler) http.Handler {
 
 // ReturnHTTPError returns an ErrorResponse back to the client if a request has failed.
 func ReturnHTTPErrorResponse(w http.ResponseWriter, errorMessage string, status int) {
-	//w.WriteHeader(status)
 	output, _ := json.Marshal(ErrorResponse{Error: errorMessage})
 	http.Error(w, string(output), status)
 }
@@ -434,24 +418,22 @@ func validateContentType(mediaType string) error {
 		return errors.New("no or unsupported Content-Type supplied")
 	}
 
-	// This in theory never happens
-	if mediaType == "" {
-		return errors.New("no content-type supplied")
-	}
-
 	return nil
 
 }
 
 func addServerExcludedHeaders(configHeaders *[]string) {
 
+	// These are hardcoded to always ensure they are present, as these fields can change between the client and RQ
 	serverExcludedHeaders := []string{"Content-Length", "User-Agent", "Content-Type", "Accept"}
 
 	for _, key := range serverExcludedHeaders {
 		if helpers.Contains(configHeaders, key) == false {
-			config.Config.Server.ExcludedHeaders = append(config.Config.Server.ExcludedHeaders, key)
+
+			*configHeaders = append(*configHeaders, key)
 		}
 	}
+
 }
 
 // getRqId returns the RQ ID from the Request's Context

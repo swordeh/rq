@@ -62,7 +62,9 @@ func CheckExtensionIsAllowed(filename string, allowedExtensionsRegex string) (is
 }
 
 func NewInMemoryFileStore() (*InMemoryFileStore, error) {
-	return &InMemoryFileStore{files: make(map[string][]byte)}, nil
+	return &InMemoryFileStore{
+		files: make(map[string][]byte),
+	}, nil
 }
 
 func (mfs *InMemoryFileStore) Save(filename string, contents io.Reader) error {

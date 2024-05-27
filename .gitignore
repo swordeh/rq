@@ -1,3 +1,5 @@
 .idea
 *.mp4
 *.sqlite
+c.out
+coverage.html
