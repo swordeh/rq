@@ -174,7 +174,16 @@ func (rs *RecordServer) HandleRequest(req *http.Request, record *records.RqRecor
 	}
 
 	// Save Headers to Record
-	record.SetHeaders(req.Header)
+	headers := map[string][]string{}
+	for key, values := range req.Header {
+		// If the request header is not in the excluded list, add to the record map
+		if helpers.Contains(&config.Config.Server.ExcludedHeaders, key) == false {
+			headers[key] = values
+		}
+	}
+
+	out, _ := json.Marshal(headers)
+	record.Headers = out
 
 	record.Status = "PENDING"
 	err = rs.saveRecord(*record)
