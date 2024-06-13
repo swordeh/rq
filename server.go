@@ -176,6 +176,7 @@ func (rs *RecordServer) HandleRequest(req *http.Request, record *records.RqRecor
 	// Save Headers to Record
 	record.SetHeaders(req.Header)
 
+	record.Status = "PENDING"
 	err = rs.saveRecord(*record)
 	if err != nil {
 		return err

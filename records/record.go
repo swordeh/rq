@@ -14,6 +14,7 @@ type RqRecord struct {
 	Url         string          `json:"url"`
 	FileKeys    string          `json:"file_keys"`
 	Payload     json.RawMessage `json:"payload"`
+	Status      string          `json:"status"`
 	Error       string          `json:"error"`
 }
 
