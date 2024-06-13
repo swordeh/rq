@@ -344,10 +344,10 @@ func (rs *RecordServer) HandleFilesInRequest(req *http.Request) (keys []string, 
 			}
 		}
 		srcFileName := fileHeaders.Filename
-		fmt.Println("Checking file extension: ", srcFileName)
+		//fmt.Println("Checking file extension: ", srcFileName)
 
 		fileExtOk, ext := files.CheckExtensionIsAllowed(srcFileName, config.Config.PermittedFileExtensions)
-		fmt.Println("File extension is ok: ", fileExtOk, config.Config.PermittedFileExtensions)
+		//fmt.Println("File extension is ok: ", fileExtOk, config.Config.PermittedFileExtensions)
 		if fileExtOk == false {
 			errMsg := fmt.Sprintf("File extension not allowed: %v", srcFileName)
 			return []string{key}, StatusError{
@@ -373,7 +373,6 @@ func (rs *RecordServer) HandleFilesInRequest(req *http.Request) (keys []string, 
 }
 
 func (rs *RecordServer) saveRecord(record records.RqRecord) error {
-	fmt.Println(record)
 	err := rs.Store.Add(record)
 	if err != nil {
 		out := fmt.Sprintf("%v: Record save failed: %v", record.Id, err)
