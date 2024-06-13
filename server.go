@@ -14,6 +14,7 @@ import (
 	"rq/files"
 	"rq/helpers"
 	"rq/records"
+	"time"
 )
 
 type HttpError interface {
@@ -186,6 +187,10 @@ func (rs *RecordServer) HandleRequest(req *http.Request, record *records.RqRecor
 	record.Headers = out
 
 	record.Status = "PENDING"
+	timeNow := time.Now()
+	record.CreatedAt = timeNow
+	record.UpdatedAt = timeNow
+
 	err = rs.saveRecord(*record)
 	if err != nil {
 		return err
@@ -368,6 +373,7 @@ func (rs *RecordServer) HandleFilesInRequest(req *http.Request) (keys []string, 
 }
 
 func (rs *RecordServer) saveRecord(record records.RqRecord) error {
+	fmt.Println(record)
 	err := rs.Store.Add(record)
 	if err != nil {
 		out := fmt.Sprintf("%v: Record save failed: %v", record.Id, err)

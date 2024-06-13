@@ -24,7 +24,7 @@ func NewSqliteRecordStore(path string) (*SqliteRecordStore, error) {
 }
 
 func (s *SqliteRecordStore) Add(record records.RqRecord) error {
-	err := s.db.Create(record).Error
+	err := s.db.Create(&record).Error
 	return err
 }
 
