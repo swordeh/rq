@@ -52,6 +52,7 @@ func (s StatusError) Status() int {
 func (rs *RecordServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 
+
 	rqId := getRqId(req)
 
 	querystring := req.URL.Query()
@@ -113,6 +114,7 @@ func (rs *RecordServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		ReturnHTTPErrorResponse(w, http.StatusText(http.StatusNotImplemented), http.StatusNotImplemented)
 		return
 	}
+
 
 	result, _ := json.Marshal(rqreq)
 	io.WriteString(w, string(result))
@@ -370,6 +372,7 @@ func (rs *RecordServer) HandleFilesInRequest(req *http.Request) (keys []string, 
 
 	}
 	return fileKeys, nil
+
 }
 
 func (rs *RecordServer) saveRecord(record records.RqRecord) error {
@@ -441,6 +444,7 @@ func addServerExcludedHeaders(configHeaders *[]string) {
 
 	for _, key := range serverExcludedHeaders {
 		if helpers.Contains(configHeaders, key) == false {
+
 			*configHeaders = append(*configHeaders, key)
 		}
 	}

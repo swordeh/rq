@@ -101,6 +101,7 @@ func TestRecordServer_HandleQuerystringPayload(t *testing.T) {
 		Store     records.RecordStore
 		FileStore files.FileStore
 	}
+
 	type args struct {
 		qs     map[string][]string
 		record *records.RqRecord
@@ -291,6 +292,7 @@ func NewMockRequestWithFile(filename string, fileContents []byte) (*http.Request
 	multipartWriter := multipart.NewWriter(requestBody)
 
 	// Write the file to the writer
+
 	fileWriter, err := multipartWriter.CreateFormFile("file", filename)
 	if err != nil {
 		return &http.Request{}, errors.New("Error creating form file")
@@ -300,6 +302,7 @@ func NewMockRequestWithFile(filename string, fileContents []byte) (*http.Request
 	_, err = fileWriter.Write(fileContents)
 	if err != nil {
 		return &http.Request{}, errors.New("Error writing file contents")
+
 	}
 
 	// Close the writer
@@ -353,6 +356,7 @@ func TestRecordServer_HandleMediaType(t *testing.T) {
 		FileStore files.FileStore
 	}
 	type args struct {
+
 		mediaType string
 		req       *http.Request
 		record    *records.RqRecord
@@ -848,6 +852,7 @@ func TestHandleRequest(t *testing.T) {
 func TestRecordServer_ServeHTTP(t *testing.T) {
 
 	tests := []struct {
+
 		name         string
 		inputRequest func(method string) *http.Request
 		method       string
